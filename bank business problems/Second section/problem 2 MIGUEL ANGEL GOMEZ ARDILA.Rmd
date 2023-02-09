@@ -1,0 +1,512 @@
+---
+title: "Problema 2"
+author: Miguel Gomez 
+date: '2022-12-10'
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Objetivo**
+
+Desarrollar una segmentación de los clientes del Banco Santander para generar una perfilación dependiendo de sus características.
+
+Para este ejercicio se tuvieron en cuenta las siguientes variables(Sintéticas):
+
+“EDAD","CROSS_SELLING","CUADRANTE_ALTO","CUADRANTE_BAJO", "Transacciones_TC","Consumo_TC","Cantidad_prestamos","PoseeTC", "Tot_seguros","Tot_debitos
+
+
+**Importando librerias**
+
+```{r}
+# INICIO CODIGO -----------------------------------------------------------
+library(data.table)
+library(dplyr)
+library(factoextra)
+```
+
+Se importa el dataframe con la data de diciembre de 2013 donde se incluyen todas las variables.
+```{r}
+df <- fread("CLIENTES_201312_COMA.csv")
+```
+
+Se seleccionan las variables a trabajar para el modelo 
+
+```{r}
+# Seleccionando las variables a trabajar ----------------------------------
+
+my_data =  df[,c("EDAD","CROSS_SELLING",
+                 "AVIS_TRX","AMEX_TRX","AVIS_CONSUMO",
+                 "AMEX_CONSUMO","PP_CANT","PH_CANT",
+                 "PR_CANT","SPRE","T_AVIS",
+                 "T_AMEX","SEG_VIDA_OM","SEG_AUTO",
+                 "SEG_VIVI","SEG_AP","DEB_CUENTA",
+                 "DEB_AVIS","DEB_AMEX","CUADRANTE")]
+``` 
+
+Se crean las variables CUADRANTE_ALTO, CUADRANTE_MEDIO, CUADRANTE_BAJO, en donde cada una de las tres variables generadas agrupa diferentes cuadrantes de la variable "CUADRANTE de acuerdo con la regla de negocio que agrupa S2, S3, A1, A3, A3 en una categoría de clientes. B1, B2, B3 en una categoría de clientes y finalmente C1,C2,C3,D1,D2,D3 en una categoría.
+
+```{r}
+# Creando la variable cuadrante -------------------------------------------
+
+# Creando variable cuadrante alto, clientes con un volumen alto
+my_data$CUADRANTE_ALTO = ifelse(my_data$CUADRANTE == "S1" |
+                        my_data$CUADRANTE == "S2" |
+                        my_data$CUADRANTE == "S3" |
+                        my_data$CUADRANTE == "A1" |
+                        my_data$CUADRANTE == "A2" |
+                        my_data$CUADRANTE == "A3",1,0)
+
+
+# Creando variable cuadrante Medio, clientes con un volumen medio
+
+my_data$CUADRANTE_MEDIO = ifelse(my_data$CUADRANTE == "B1" |
+                                  my_data$CUADRANTE == "B2" |
+                                  my_data$CUADRANTE == "B3",1,0)
+
+# Creando variable cuadrante Bajo, clientes con un volumen bajo 
+
+my_data$CUADRANTE_BAJO = ifelse(my_data$CUADRANTE == "C1" |
+                                  my_data$CUADRANTE == "C2" |
+                                  my_data$CUADRANTE == "C3" |
+                                  my_data$CUADRANTE == "D1" |
+                                  my_data$CUADRANTE == "D2" |
+                                  my_data$CUADRANTE == "D3",1,0)
+```
+
+A continuación se hace una limpieza de los datos, pese a no tener datos faltantes se hace necesario convertir los asteriscos (*) que aparezcan en las diferentes variables en 0
+
+```{r}
+# Limpiando variables -----------------------------------------------------
+
+colSums(is.na(my_data))
+attach(my_data)
+my_data = my_data %>% mutate_if(is.character,as.numeric)
+my_data = my_data  %>% mutate_all(function(x){ifelse(is.na(x),0,x)})
+str(my_data)
+```
+
+En esta sección se hizo una selección de las variables relacionadas con las tarjetas de crédito, primero se agrupo las transacciones de las tarjetas de crédito AMEX y VISA en una sola variable llamada Transacciones_TC. Posteriormente se agrupo el consumo de las tarjetas AMEX y VISA en una sola variable llamada Consumo_TC.
+
+```{r}
+# Tarjetas de Credito -----------------------------------------------------
+
+
+my_data$Transacciones_TC= my_data$AVIS_TRX + my_data$AMEX_TRX
+my_data$Consumo_TC = my_data$AVIS_CONSUMO + my_data$AMEX_CONSUMO #
+```
+
+A continuación se crea una variable que agrupa los diferentes prestamos que puede tener un cliente.
+
+```{r}
+# Prestamos ---------------------------------------------------------------
+
+my_data$Cantidad_prestamos = my_data$PP_CANT + my_data$PH_CANT + my_data$PR_CANT + my_data$SPRE #
+```
+
+En la siguiente línea de código se crea la variable de tenencia de tarjeta de crédito se suman las variables T_AVIS y T_AMEX lo cual va a generar una nueva variable con valores del 0 al 2 que indica si tiene 0, 1 o 2 tarjetas de crédito.
+
+```{r}
+# Posee tarjeta de credito ------------------------------------------------
+
+my_data$PoseeTC = my_data$T_AVIS + my_data$T_AMEX #
+```
+
+En la siguiente variable se agrupan los diferentes seguros que puede tener un cliente del banco.
+```{r}
+# Seguros -----------------------------------------------------------------
+
+my_data$Tot_seguros = my_data$SEG_VIDA_OM + my_data$SEG_AUTO + my_data$SEG_VIVI + my_data$SEG_AP #
+```
+
+En la siguiente variable se agrupan los debitos del los clientes de acuerdo con las variables DEB_CUENTA, DEB_AVIS y DEB_AMEX
+```{r}
+# Debito ------------------------------------------------------------------
+
+my_data$Tot_debitos = my_data$DEB_CUENTA + my_data$DEB_AVIS + my_data$DEB_AMEX #
+```
+
+
+A continuación, se hace una selección de las variables que se van a tomar en el PCA, en donde se tienen en cuenta únicamente dos de las 3 variables categóricas de cuadrante, dado que solo dos de las 3 son necesarias por su explicabilidad. Adicionalmente se tomaron las variables calculadas previamente y las variables Edad y CROSS_SELLING que no se les hizo alguna modificación mas allá de la limpieza.
+
+```{r}
+# Selección de variables para el modelo -----------------------------------
+
+my_data =  my_data[,c("EDAD","CROSS_SELLING",
+                      "CUADRANTE_ALTO","CUADRANTE_BAJO",
+                      "Transacciones_TC","Consumo_TC",
+                      "Cantidad_prestamos","PoseeTC",
+                      "Tot_seguros","Tot_debitos")]
+```
+
+En la siguiente sección se aplica el PCA.
+```{r}
+#---------------- Analisis de componentes principales (PCA)
+
+# Escalado componentes principales
+bank_scale <- scale(my_data)
+res.pca <- prcomp(bank_scale,  scale = FALSE,center = FALSE )
+res.pca
+```
+
+Se observa que para la primera componente las variables significativas fueron: CROSS_SELLING, CUADRANTE_ALTO, PoseeTC, Transacciones_TC, Tot_debitos. En la segunda componente las variables significativas son: Consumo_TC y  Cantidad_prestamos.
+Para la tercera componente las variables significativas son: EDAD, CUADRANTE_BAJO y Tot_seguros
+
+```{r}
+summary(res.pca)
+```
+
+A continuación, se observa que de acuerdo con la desviación estándar de cada componente se van a tomar únicamente las componentes con desviación estándar mayor a 1, es decir las primeras 3 componentes. por otra parte, se logró capturar el 64% de la variabilidad de los datos.
+
+```{r}
+# Resultado componentes
+res.pca$rotation
+```
+
+**Ánalisis Gráfico Componentes**
+
+En el siguiente bloque de código se hace un análisis gráfico de las componentes principales. Donde se seleccionan las 4 componentes más representativas entre el componente 2 y 1
+```{r}
+# Ánalisis Gráfico Componentes --------------------------------------------
+# Filtro de acuerdo con la importancia ****
+fviz_pca_var(res.pca, select.var = list(contrib = 4))+
+  theme_minimal()
+```
+
+Ahora se hace una selección de las 3 primeras componentes las cuales se guardan en data_transform
+```{r}
+#Nueva base segmentacion ****
+data_transform = as.data.table(res.pca$x[,1:3]) # aqui está estrayendo las dos primeras componentes de todos los individuos
+head(data_transform)
+```
+
+Posteriormente se aplica el método del codo el cual permite identificar en cuantos cluster se debería hacer el kmeans, cabe resaltar que no es del todo optimo por lo que en este caso se probó con 3 cuadrtantes que era lo recomendado y finalmente se seleccionaron 4
+```{r}
+# Método del codo
+
+
+set.seed(1234)
+wcss <- vector()
+for(i in 1:20){
+  wcss[i] <- sum(kmeans(data_transform, i)$withinss)
+}
+plot(wcss)
+plot(wcss, type = "b")
+```
+
+```{r}
+# Kmeans ------------------------------------------------------------------
+k = 4
+set.seed(1234)
+kmeans_data = kmeans(data_transform, centers = k, nstart = 10)
+
+kmeans_data
+
+#Visualizacion segmentacion
+#fviz_cluster(kmeans_data, data = data_transform)+
+#  theme_bw()
+
+
+```
+
+Una vez teniendo los clusters se saca la proporción de clientes en cada uno de estos, en donde el cluster con mayor cantidad de clientes para diciembre de 2013 es el numero 3 con el 38% de los clientes.
+```{r}
+###Perfilamiento
+#asignacion cluster
+my_data$cluster <- kmeans_data$cluster
+
+#Proporcion cluster
+round(prop.table(table(my_data$cluster)),3)
+```
+
+Con cada de los cluster obtenidos en el KNN para el periodo de diciembre de 2013 se extrajo un resumen de cada una de las variables para los diferentes cluster. 
+
+Cluster 1: el 87% de los clientes de este cluster pertenecen al cuadrante bajo, son los que menos transacciones de tarjeta de crédito hacen y menos gastan con estas, así mismo no tienen tarjetas de crédito en su mayoría dado que el promedio de tenencia de este producto es cercano a 0, es importante destacar que este cluster está constituido principalmente por personas mayores a los 50 años.
+
+Cluster 2: en este cluster se agrupan las personas que más seguros tienen con un valor promedio de 0.83 y en el segmento entre todos los clientes hay 458522 seguros.
+
+
+```{r}
+# calculando total de seguros por cluster
+my_data %>% select(c(Tot_seguros,cluster ))%>%
+  group_by(cluster) %>%
+  summarise_all("sum")
+```
+
+cluster 3: este cluster tiene el menor promedio de edad equivalente a 31.71 años, así mismo agrupa los clientes con menor cantidad de seguros y menor cantidad de débitos.
+
+cluster 4: los clientes con mayor valor de closs_selling se agrupan en este cluster, adicionalmente un 88% de los clientes de este cluster pertenece al cuadrante alto siendo este el predominante, tienen mayor cantidad de préstamos, mayor cantidad de tarjetas de crédito, son los que más consumen en tarjeta de crédito y mayor cantidad de transacciones realizan con estas, como se observa en la tabla a continuación.
+
+
+```{r}
+#Perfilamiento
+df_perfilamiento<-my_data %>% select(c(EDAD, CROSS_SELLING, CUADRANTE_ALTO,CUADRANTE_BAJO,Transacciones_TC,Consumo_TC,Cantidad_prestamos,PoseeTC,Tot_seguros,Tot_debitos,cluster ))%>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+df_perfilamiento
+```
+
+Luego de obtener los cluster y hacer el analisis para diciembre del 2013, se debe hacer el mismo proceso de limpieza y selección de variables para la data de junio de 2014, lo cual se hace en el siguiente bloque de código. Es importante aclarar que no se hace ningún proceso de PCA para esta base.
+
+```{r}
+# Importando base de datos de junio de 2014 -------------------------------
+
+df_2014 <- fread("CLIENTES_201406.csv")
+
+# Seleccionando las variables a trabajar 2014 ----------------------------------
+
+my_data_2014 =  df_2014[,c("EDAD","CROSS_SELLING",
+                 "AVIS_TRX","AMEX_TRX","AVIS_CONSUMO",
+                 "AMEX_CONSUMO","PP_CANT","PH_CANT",
+                 "PR_CANT","SPRE","T_AVIS",
+                 "T_AMEX","SEG_VIDA_OM","SEG_AUTO",
+                 "SEG_VIVI","SEG_AP","DEB_CUENTA",
+                 "DEB_AVIS","DEB_AMEX","CUADRANTE")]
+
+# Creando la variable cuadrante -------------------------------------------
+
+# Creando variable cuadrante alto para 2014, clientes con un volumen alto
+my_data_2014$CUADRANTE_ALTO = ifelse(my_data_2014$CUADRANTE == "S1" |
+                                  my_data_2014$CUADRANTE == "S2" |
+                                  my_data_2014$CUADRANTE == "S3" |
+                                  my_data_2014$CUADRANTE == "A1" |
+                                  my_data_2014$CUADRANTE == "A2" |
+                                  my_data_2014$CUADRANTE == "A3",1,0)
+
+
+# Creando variable cuadrante Medio de 2014, clientes con un volumen medio
+
+my_data_2014$CUADRANTE_MEDIO = ifelse(my_data_2014$CUADRANTE == "B1" |
+                                        my_data_2014$CUADRANTE == "B2" |
+                                        my_data_2014$CUADRANTE == "B3",1,0)
+
+# Creando variable cuadrante Bajo de 2014, clientes con un volumen bajo 
+
+my_data_2014$CUADRANTE_BAJO = ifelse(my_data_2014$CUADRANTE == "C1" |
+                                       my_data_2014$CUADRANTE == "C2" |
+                                       my_data_2014$CUADRANTE == "C3" |
+                                       my_data_2014$CUADRANTE == "D1" |
+                                       my_data_2014$CUADRANTE == "D2" |
+                                       my_data_2014$CUADRANTE == "D3",1,0)
+
+# Limpiando variables de 2014 -----------------------------------------------------
+
+colSums(is.na(my_data_2014))
+attach(my_data_2014)
+my_data_2014 = my_data_2014 %>% mutate_if(is.character,as.numeric)
+my_data_2014 = my_data_2014  %>% mutate_all(function(x){ifelse(is.na(x),0,x)})
+str(my_data_2014)
+
+
+# Tarjetas de Credito 2014 -----------------------------------------------------
+
+
+my_data_2014$Transacciones_TC= my_data_2014$AVIS_TRX + my_data_2014$AMEX_TRX
+my_data_2014$Consumo_TC = my_data_2014$AVIS_CONSUMO + my_data_2014$AMEX_CONSUMO #
+
+
+# Prestamos de 2014---------------------------------------------------------------
+
+my_data_2014$Cantidad_prestamos = my_data_2014$PP_CANT + my_data_2014$PH_CANT + my_data_2014$PR_CANT + my_data_2014$SPRE #
+
+
+
+# Posee tarjeta de credito de 2014------------------------------------------------
+
+my_data_2014$PoseeTC = my_data_2014$T_AVIS + my_data_2014$T_AMEX # 
+
+
+# Seguros de 2014 -----------------------------------------------------------------
+
+my_data_2014$Tot_seguros = my_data_2014$SEG_VIDA_OM + my_data_2014$SEG_AUTO + my_data_2014$SEG_VIVI + my_data_2014$SEG_AP #
+
+
+
+# Debito de 2014 ------------------------------------------------------------------
+
+my_data_2014$Tot_debitos = my_data_2014$DEB_CUENTA + my_data_2014$DEB_AVIS + my_data_2014$DEB_AMEX #
+
+
+# Selección de variables para el modelo de 2014 -----------------------------------
+
+my_data_2014 =  my_data_2014[,c("EDAD","CROSS_SELLING",
+                      "CUADRANTE_ALTO","CUADRANTE_BAJO",
+                      "Transacciones_TC","Consumo_TC",
+                      "Cantidad_prestamos","PoseeTC",
+                      "Tot_seguros","Tot_debitos")]
+```
+
+**Decision Tree**
+
+Para la asignación de los cluster en el periodo de junio de 2014 se empleó un árbol de decisión, tomando como datos de entrenamiento la base de diciembre de 2013 y como testeo la base de junio de 2014.
+```{r}
+# Desicion Tree -----------------------------------------------------------
+
+# cargando librerias
+
+library(rpart)
+library(rattle)
+library(rpart.plot)
+
+#Base de entrenamiento data del 2013
+train<-my_data
+train$cluster <- factor(train$cluster)
+
+# Creando arbol
+arbol = rpart(train$cluster ~ .,data=train)
+
+#Base de prueba data del 2014
+test<-my_data_2014
+# predicción de Cluster en la base del 2014
+predict_arbol = predict(arbol,test, type = "class")
+
+#pasando a data.table predict_arbol
+predict_arbol <- as.data.table(predict_arbol)
+
+# Agregando los resultados de la prediccion del arbol de decisión al dataframe test
+test$cluster = predict_arbol$predict_arbol
+```
+
+**análisis de clusters 2013 vs 2014**
+
+Para comparar los datasets de junio de 2014 y diciembre de 2013 primero se debe agregar las IDs de los clientes a los dataframes que guardan las características de cada periodo, lo cual se hace en el siguiente bloque de código.
+
+```{r}
+# pegando los IDs a cada una de las bases 
+
+test$ID_CLIENTE_2014 = df_2014$ID_CLIENTE
+train$ID_CLIENTE_2013 = df$ID_CLIENTE
+```
+
+Se debe agregar la variable de actividad a cada base de datos de cada periodo por lo cual se procede a importar un df con esta informacion para cada periodo, se seleccionan las variables Key para cada df que va a ser el ID_cliente y se hacen los respectivos FULL JOIN para verificar que no quede ningún valor afuera.
+```{r}
+# Importando bases de datos de cada periodo con la variable actividad
+
+importe_201312 <- fread("Importe_201312.csv", sep = "~")
+importe_201406 <- fread("Importe_201406.csv", sep = "~")
+
+# seleccionando variables a usar de los df de importe
+
+importe_201312 =  importe_201312[,c("ID_CLIENTE","FlagActividad")]
+importe_201406 =  importe_201406[,c("ID_CLIENTE","FlagActividad")]
+
+#join entre importe y base de trabajo para cada periodo
+
+train <- merge(train, importe_201312, by.x = "ID_CLIENTE_2013" , by.y="ID_CLIENTE", all = TRUE )
+
+test <- merge(test, importe_201406, by.x ="ID_CLIENTE_2014" ,by.y="ID_CLIENTE", all = TRUE )
+
+```
+
+
+Despues de agragar las IDs a los diferentes periodos se debe hacer un FULL JOIN por estas IDs.
+```{r}
+# haciendo el merge full para comparar los clientes que han cambiando de cluster 
+
+df_comparacion_2013_2014 <- merge(test, train, by.x ="ID_CLIENTE_2014" , by.y ="ID_CLIENTE_2013", all = TRUE )
+```
+
+**Cantidad de clientes por periodo**
+
+Comparando el periodo de diciembre de 2013 con junio de 2014 se puede identificar en las siguientes tablas que se sigue manteniendo el 3 cluster como el que mayor cantidad de clientes tiene, aunque pasa de tener 938099 clientes en diciembre de 2013 a tener 887340 clientes en 2014, cabe resaltar que en junio de 2014 se registran 177720 clientes nuevos pero se fueron de la compañía 181221.
+
+Es importante analizar el cluster 4 pues es el más representativo para la compañía en temas de tarjetas de crédito para diciembre de 2013, pues son los clientes que más gastan, para junio de 2014 pasa de tener 154371 clientes a 119000 lo cual es una pérdida importante.
+
+```{r}
+# contando los valores por cluster del 2014
+df_comparacion_2013_2014[, .N, by = "cluster.x"][order(cluster.x)]
+```
+```{r}
+# contando los valores por cluster del 2013
+df_comparacion_2013_2014[, .N, by = "cluster.y"][order(cluster.y)]
+```
+
+En cuanto a proporción de clientes por cluster se puede observar que para junio de 2014 el cluster que menos clientes tiene es el 4 con 5.1% disminuyendo un 1.5% en comparación con el periodo de diciembre de 2013. Para el caso del cluster 1 se observa que incrementó un 3.1% para el periodo de junio de 2014.
+
+```{r}
+# caracteristicas de clusters del 2014 
+
+# proporcion de los cluster en 2014
+round(prop.table(table(df_comparacion_2013_2014$cluster.x)),3)
+
+#proporcion cluster 2013
+round(prop.table(table(df_comparacion_2013_2014$cluster.y)),3)
+```
+
+**Características de clusters en junio de 2014**
+
+Cluster 1: en comparación con el periodo de diciembre de 2013 la proporción de clientes en el cuadrante bajo incrementa un 2% pasando a un 89% en este cluster, estos clientes continúan siendo los que menos transacciones de tarjeta de crédito hacen y menos gastan en estas, así mismo no tienen tarjetas de crédito en su mayoría, dado que el promedio de tenencia de este producto es cercano a 0. 
+En cuanto a los usuarios activos este es el cuadrante que menos usuarios activos tienen con un 60% de sus usuarios activos.
+
+a continuación, se genera una tabla con la variable promedio de actividad por cada cuadrante para diciembre de 2013 con el fin de comparar con el periodo junio de 2014 en donde se ve que para el periodo final disminuye la actividad en un 2%.
+
+```{r}
+train %>% select(c(cluster, FlagActividad ))%>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+
+```
+
+Cluster 2: en este cluster se agrupan las personas que más seguros tienen con un valor promedio de 0.83 y en el segmento entre todos los clientes hay 467272 seguros, en comparación con el periodo de diciembre de 2013 no hay un cambio significativo.
+
+```{r}
+# calculando total de seguros por cluster
+test %>% select(c(Tot_seguros,cluster ))%>%
+  group_by(cluster) %>%
+  summarise_all("sum")
+```
+
+cluster 3: este cluster tiene el menor promedio de edad equivalente a 32 años, así mismo agrupa los clientes con menor cantidad de seguros y menor cantidad de débitos, no representa un cambio significativo con respecto al periodo de diciembre de 2013. En cuanto a la actividad de los usuarios se puede evidenciar en la tabla que agrupa actividad de los usuarios por cluster del periodo de diciembre de 2013 que la actividad es de 76% la cual en el periodo de junio de 2014 disminuye en un 3%. Para este cluster la actividad de los usuarios se mantiene para este periodo en el 99% y no hay un cambio significativo con respecto al periodo de diciembre de 2013.
+
+cluster 4: los clientes con mayor valor de cross_selling se agrupan en este cluster, adicionalmente un 83% de los clientes de este cluster pertenece al cuadrante alto siendo este el predominante cabe destacar que en comparación con el periodo de diciembre de 2013 disminuye esta proporción en un 5%. Para este cluster la actividad de los usuarios se mantiene para este periodo en el 99% y no hay un cambio significativo con respecto al periodo de diciembre de 2013.
+
+
+
+```{r}
+#Perfilamiento 2014
+
+
+df_perfilamiento_2014<-test %>% select(c(EDAD, CROSS_SELLING, CUADRANTE_ALTO,CUADRANTE_BAJO,Transacciones_TC,Consumo_TC,Cantidad_prestamos,PoseeTC,Tot_seguros,Tot_debitos,cluster, FlagActividad ))%>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+df_perfilamiento_2014
+```
+
+**Análisis de Cambio de cuadrante**
+
+Para junio de 2014 ocurre 12 tipos de cambio de cluster de los cuales es importante destacar el cambio del cluster 3 al cluster 1 de 113726 usuarios, del cluster 2 al cluster 3 de 74863 usuarios, por otra parte, la mayor cantidad de usuarios nuevos es del cuadrante 3 que equivale a 116532 para junio de 2014 por último los usuarios que se fueron de la compañía en junio de 2014 fueron 110987 pertenecientes al cuadrante 3.
+
+```{r}
+# agrupado cluster.x cluster.y para mirar cuales cambian de cluster de diciembre 2013 a junio de 2014
+cambio_cluster= df_comparacion_2013_2014[, .N, by = c("cluster.x", "cluster.y")]
+cambio_cluster$compacion <- ifelse(cambio_cluster$cluster.x == cambio_cluster$cluster.y,"Igual","diferente")
+cambio_cluster
+```
+
+**Conclusiones**
+
+
+- Para los cluster 3 y 4 la actividad de los usuarios se mantiene en un 99% en los dos periodos comparados.
+
+- El cluster con mayor movilidad de usuarios es el tres, pues se integraron 74863 provenientes del cluster dos, adicionalmente cambiaron de este cluster al cluster uno 113726 usuario, por otra parte se retiraron 110987 usuarios pertenecientes a este cluster y llegaron 116532 usuarios nuevos a este cluster.
+
+-Hay un incremento del 3.1% para los clientes del segmento 1 , para el segmento 2 se presenta un incremento del 0.6%, para el segmento 3 se presenta una disminución del (-2.1%),  y para el segmento 4 una disminución del (-1.5), lo anterior calculado entre las diferencias de junio del 2014 y diciembre del 2013.
+
+
+
+
+**Sugerencias al área de fidelización**
+
+
+Para los clientes del segmento 1 para la variable Consumo_TC se propone la eliminación total de la cuota de manejo cuando posean mínimo 2 tarjetas de crédito del banco Santander.
+
+Se sugiere que para los clientes del segmento 1 se diseñe un sistema de puntos acumulables y canjeables por premios.
+Se sugieren campañas para ofrecer productos por medio de redes sociales para los usuarios del cluster 3 debido a su edad de promedio 32,2 años en junio de 2014 y el movimiento que presenta este cluster.
+
+Para los clientes del segmento 4 se sugiere premiar su consumo con descuentos en restaurantes, millas de vuelo y sorteos, dado que es el segmento que mas tiende a usar tarjetas de crédito.
+
