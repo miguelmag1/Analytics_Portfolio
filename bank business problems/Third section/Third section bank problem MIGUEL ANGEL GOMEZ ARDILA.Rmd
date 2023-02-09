@@ -1,0 +1,502 @@
+---
+title: "clientes no activos en diciembre"
+author: Miguel Gomez 
+date: '2023-01-25'
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Objetivo**
+
+Identificar los clientes que estarán inactivos en el mes de diciembre de 2014 mediante modelos predictivos
+
+```{r}
+# INICIO CODIGO -----------------------------------------------------------
+library(data.table)
+library(dplyr)
+library(factoextra)
+```
+**Preprocesamiento para datos de septiembre**
+
+Importando df de septiembre
+```{r}
+df_201409= fread("CLIENTES_201409.csv" , sep = ",", colClasses=c(PERIODO="character",ID_CLIENTE="character"))
+```
+
+```{r}
+names(df_201409)
+
+```
+
+Se seleccionan las variables a trabajar antes de crear el df que junte los tres meses
+```{r}
+df_201409 =  df_201409[,c("PERIODO","ID_CLIENTE","EDAD",
+                          "CROSS_SELLING","AVIS_TRX","AMEX_TRX",
+                          "AVIS_CONSUMO","AMEX_CONSUMO","PP_CANT",
+                          "PH_CANT","PR_CANT","SPRE","T_AVIS",
+                          "T_AMEX","SEG_VIDA_OM","SEG_AUTO",
+                          "SEG_VIVI","SEG_AP","DEB_CUENTA",
+                          "DEB_AVIS","DEB_AMEX","CUADRANTE","FlagActividad")]
+```
+Cambiando el nombre a la columna FlagActividad
+```{r}
+colnames(df_201409)[colnames(df_201409) == "FlagActividad"] <- "ActPresente"
+```
+
+
+
+
+Se crean las variables CUADRANTE_ALTO, CUADRANTE_MEDIO, CUADRANTE_BAJO, en donde cada una de las tres variables generadas agrupa diferentes cuadrantes de la variable "CUADRANTE de acuerdo con la regla de negocio que agrupa S2, S3, A1, A3, A3 en una categoría de clientes. B1, B2, B3 en una categoría de clientes y finalmente C1,C2,C3,D1,D2,D3 en una categoría.
+
+```{r}
+# Creando la variable cuadrante -------------------------------------------
+
+# Creando variable cuadrante alto, clientes con un volumen alto
+df_201409$CUADRANTE_ALTO = ifelse(df_201409$CUADRANTE == "S1" |
+                        df_201409$CUADRANTE == "S2" |
+                        df_201409$CUADRANTE == "S3" |
+                        df_201409$CUADRANTE == "A1" |
+                        df_201409$CUADRANTE == "A2" |
+                        df_201409$CUADRANTE == "A3",1,0)
+
+
+# Creando variable cuadrante Medio, clientes con un volumen medio
+
+df_201409$CUADRANTE_MEDIO = ifelse(df_201409$CUADRANTE == "B1" |
+                                  df_201409$CUADRANTE == "B2" |
+                                  df_201409$CUADRANTE == "B3",1,0)
+
+# Creando variable cuadrante Bajo, clientes con un volumen bajo 
+
+df_201409$CUADRANTE_BAJO = ifelse(df_201409$CUADRANTE == "C1" |
+                                  df_201409$CUADRANTE == "C2" |
+                                  df_201409$CUADRANTE == "C3" |
+                                  df_201409$CUADRANTE == "D1" |
+                                  df_201409$CUADRANTE == "D2" |
+                                  df_201409$CUADRANTE == "D3",1,0)
+```
+
+A continuación se hace una limpieza de los datos, pese a no tener datos faltantes se hace necesario convertir los asteriscos (*) que aparezcan en las diferentes variables en 0
+
+```{r}
+# Limpiando variables -----------------------------------------------------
+
+colSums(is.na(df_201409))
+df_201409 = df_201409 %>% mutate_if(is.character,as.numeric)
+df_201409 = df_201409  %>% mutate_all(function(x){ifelse(is.na(x),0,x)})
+str(df_201409)
+```
+
+```{r}
+unique(df_201409$PERIODO)
+```
+Funcion para corregir el periodo 
+
+```{r}
+correccion_periodo <- function(x) {
+
+if (x == "202209"){
+
+return("201409")
+}}
+```
+
+Aplicando funcion para corregir el periodo
+
+```{r}
+df_201409$PERIODO <- sapply(df_201409$PERIODO,correccion_periodo)
+```
+
+Verificando la correccion del periodo
+```{r}
+unique(df_201409$PERIODO)
+```
+
+En esta sección se hizo una selección de las variables relacionadas con las tarjetas de crédito, primero se agrupo las transacciones de las tarjetas de crédito AMEX y VISA en una sola variable llamada Transacciones_TC. Posteriormente se agrupo el consumo de las tarjetas AMEX y VISA en una sola variable llamada Consumo_TC.
+
+```{r}
+# Tarjetas de Credito -----------------------------------------------------
+
+
+df_201409$Transacciones_TC= df_201409$AVIS_TRX + df_201409$AMEX_TRX
+df_201409$Consumo_TC = df_201409$AVIS_CONSUMO + df_201409$AMEX_CONSUMO #
+```
+
+A continuación se crea una variable que agrupa los diferentes prestamos que puede tener un cliente.
+
+```{r}
+# Prestamos ---------------------------------------------------------------
+
+df_201409$Cantidad_prestamos = df_201409$PP_CANT + df_201409$PH_CANT + df_201409$PR_CANT + df_201409$SPRE #
+```
+
+En la siguiente línea de código se crea la variable de tenencia de tarjeta de crédito se suman las variables T_AVIS y T_AMEX lo cual va a generar una nueva variable con valores del 0 al 2 que indica si tiene 0, 1 o 2 tarjetas de crédito.
+
+```{r}
+# Posee tarjeta de credito ------------------------------------------------
+
+df_201409$PoseeTC = df_201409$T_AVIS + df_201409$T_AMEX #
+```
+
+En la siguiente variable se agrupan los diferentes seguros que puede tener un cliente del banco.
+```{r}
+# Seguros -----------------------------------------------------------------
+
+df_201409$Tot_seguros = df_201409$SEG_VIDA_OM + df_201409$SEG_AUTO + df_201409$SEG_VIVI + df_201409$SEG_AP #
+```
+
+En la siguiente variable se agrupan los debitos del los clientes de acuerdo con las variables DEB_CUENTA, DEB_AVIS y DEB_AMEX
+```{r}
+# Debito ------------------------------------------------------------------
+
+df_201409$Tot_debitos = df_201409$DEB_CUENTA + df_201409$DEB_AVIS + df_201409$DEB_AMEX #
+```
+Seleccionando variables con las que se va a trabajar
+```{r}
+# Selección de variables para el modelo -----------------------------------
+
+df_201409 =  df_201409[,c("PERIODO","ID_CLIENTE","EDAD","CROSS_SELLING",
+                      "CUADRANTE_ALTO","CUADRANTE_BAJO",
+                      "Transacciones_TC","Consumo_TC",
+                      "Cantidad_prestamos","PoseeTC",
+                      "Tot_seguros","Tot_debitos","ActPresente")]
+```
+Cambio de lavels para activo del ultimo periodo
+```{r}
+df_201409$ActFuturo[df_201409$ActFuturo == 1] <- 2
+df_201409$ActFuturo[df_201409$ActFuturo == 0] <- 1
+df_201409$ActFuturo[df_201409$ActFuturo == 2] <- 0
+
+```
+
+Convirtiendo a factor la variable activos a futuro
+```{r}
+df_201409$ActFuturo <- factor(df_201409$ActFuturo)
+```
+
+
+Filtrando los clientes activos para el mes de septiembre.
+```{r}
+df_201409=df_201409[df_201409$ActPresente == "1", ]
+```
+
+**Importando base de importe**
+Importando dataframe para crear el modelo con las variables de interes y los valores de las ventanas corredizas para los meses de abril, mayo y junio.
+
+```{r}
+df_2014040506_Activo=fread("VentanaCorrediza.csv", colClasses=c(PERIODO="character",ID_CLIENTE="character"))
+```
+
+**seleccionando variables para el modelo**
+Seleccionando variables para modelo
+
+A continuación, se hace una selección de las variables que se van a tomar para el modelo, en donde se tienen en cuenta únicamente dos de las 3 variables categóricas de cuadrante, dado que solo dos de las 3 son necesarias por su explicabilidad.
+
+Adicionalmente se tomaron las variables calculadas previamente y las variables Edad y CROSS_SELLING que no se les hizo alguna modificación mas allá de la limpieza.
+
+```{r}
+# Selección de variables para el modelo -----------------------------------
+
+df_2014040506_Activo =  df_2014040506_Activo[,c("EDAD","CROSS_SELLING",
+                      "CUADRANTE_ALTO","CUADRANTE_BAJO",
+                      "Transacciones_TC","Consumo_TC",
+                      "Cantidad_prestamos","PoseeTC",
+                      "Tot_seguros","Tot_debitos","ActPresente","ActFuturo")]
+```
+
+Se observa si hay datos faltantes en el df
+```{r}
+colSums(is.na(df_2014040506_Activo))
+#summary(df_2014040506_Activo)
+```
+Imputando los datos NA de la columna 
+```{r}
+df_2014040506_Activo$ActFuturo[is.na(df_2014040506_Activo$ActFuturo)] <- 0
+```
+Validando que los datos faltantes hayan sido reemplazados por cero.
+```{r}
+colSums(is.na(df_2014040506_Activo))
+```
+Cambio de lavels para activo del ultimo periodo
+```{r}
+df_2014040506_Activo$ActFuturo[df_2014040506_Activo$ActFuturo == 1] <- 2
+df_2014040506_Activo$ActFuturo[df_2014040506_Activo$ActFuturo == 0] <- 1
+df_2014040506_Activo$ActFuturo[df_2014040506_Activo$ActFuturo == 2] <- 0
+
+```
+Convirtiendo a factor la variable activos a futuro
+```{r}
+df_2014040506_Activo$ActFuturo <- factor(df_2014040506_Activo$ActFuturo)
+```
+
+
+Filtrando los clientes activos para los meses seleccionados: abril, mayo, junio.
+```{r}
+#*** preguntar si se toman los activos e inactivos en los 3 primeros meses
+# preguntar si se filtra con los activos en los 3 primeros meses seleccionados para el modelo
+df_2014040506_Activo=df_2014040506_Activo[df_2014040506_Activo$ActPresente == "1", ]
+```
+
+Contando cuantos pasan de ser activos a inactivos en los siguientes tres meses, siendo 1 los usuarios que pasan a ser inactivos.
+```{r}
+
+table(df_2014040506_Activo$ActFuturo)
+```
+balanceo de la base de datos
+```{r}
+library(caret)
+data_m= downSample(df_2014040506_Activo, df_2014040506_Activo$ActFuturo)
+```
+
+Contando los datos despues del balanceo.
+```{r}
+table(data_m$ActFuturo)
+```
+eliminando variable class
+```{r}
+data_m <- data_m[,-13]
+data_m
+```
+
+Partiendo los datos entre testeo, validacion y entrenamiento
+```{r}
+#convirtiendo a factor variable ActFuturo
+data_m$ActFuturo <- factor(data_m$ActFuturo)
+
+sample <- sample(c(TRUE, FALSE), nrow(data_m), replace=TRUE, prob=c(0.7,0.3))
+train_data  <- data_m[sample, ]
+test   <- data_m[!sample, ]
+```
+
+
+**Decision Tree**
+
+A continuación se crea el modelo de arbol de decisión
+
+```{r}
+# Desicion Tree -----------------------------------------------------------
+library(rpart)
+library(rattle)
+library(rpart.plot)
+# Creando arbol
+arbol = rpart(ActFuturo ~.,data=train_data, method="class")
+
+predict_train = predict(arbol,train_data, type ="prob")
+
+```
+evaluación modelo arbol
+```{r}
+library("pROC")
+####AUC TRAIN
+roc(train_data$ActFuturo, predict_train[,2])
+
+
+predict_test = predict(arbol,test, type ="prob")
+#####AUC TEST
+
+roc(test$ActFuturo, predict_test[,2])
+```
+
+matriz de confusion
+```{r}
+predict_arbol_class = predict(arbol,test, type ="class")
+table_mat <- table(test$ActFuturo, predict_arbol_class)
+table_mat
+
+```
+
+**XGBoost Classifier**
+A continuación se crea el modelo de xgboost
+
+```{r}
+library("xgboost")
+library("Matrix")
+# dependent variable
+data_m$ActFuturo = as.numeric(as.character(data_m$ActFuturo))
+
+#training and Validation dataset
+set.seed(123)
+smp_size = floor(0.7 * nrow(data_m))
+train_ind = sample(seq_len(nrow(data_m)), size = smp_size)
+
+train = data_m[train_ind, ]
+val = data_m[-train_ind, ]
+
+#prepare training data
+trainm = sparse.model.matrix(ActFuturo ~., data = train)
+train_label = train[,"ActFuturo"]
+train_matrix = xgb.DMatrix(data = as.matrix(trainm), label = train_label)
+
+#prepare validation data
+valm = sparse.model.matrix(ActFuturo ~., data= val)
+val_label = val[,"ActFuturo"]
+val_matrix = xgb.DMatrix(data = as.matrix(valm), label = val_label)
+```
+
+Entrenando el modelo xboots
+```{r}
+#parameters
+xgb_params = list(objective   = "binary:logistic",
+                   eval_metric = "error",
+                   max_depth   = 3,
+                   eta         = 0.01,
+                   gammma      = 1,
+                   colsample_bytree = 0.5,
+                   min_child_weight = 1)
+
+#model
+bst_model = xgb.train(params = xgb_params, data = train_matrix,
+                      nrounds = 1000)
+```
+
+
+```{r}
+imp = xgb.importance(colnames(train_matrix), model = bst_model)
+xgb.plot.importance(imp)
+```
+
+Evaluación del modelo XGBOOST
+```{r}
+# Evaluation Curve
+library(ROCR)
+p = predict(bst_model, newdata = val_matrix)
+val$predicted = ifelse(p > 0.5,1,0)
+confusionMatrix(table(val$predicted, val$ActFuturo))
+table(val$predicted, val$ActFuturo)
+
+```
+Valor del AUC para el Boosting
+```{r}
+roc(val$ActFuturo, p)
+```
+
+Evaluacion de la curva
+```{r}
+# Evaluation Curve
+pred=prediction(p,val$ActFuturo)
+eval= performance(pred,"acc")
+plot(eval)
+```
+evaluacion de la curva roc
+```{r}
+#Roc
+roc=performance(pred,"tpr","fpr")
+plot(roc,main="ROC curve")
+abline(a=0,b=1)
+```
+**Regresion logistica**
+
+```{r}
+# Loading package
+library(caTools)
+
+
+# Training model
+logistic_model <- glm(ActFuturo ~.,data=train_data,
+					family = "binomial")
+logistic_model
+```
+**Evaluacion del modelo**
+```{r}
+# Summary
+summary(logistic_model)
+```
+
+Se obtienen las probabilidades del modelo de regresión logistica.
+```{r}
+# Predict test data based on model
+predict_reg <- predict(logistic_model,
+					test, type = "response")
+predict_reg
+```
+
+Se obtienen las métricas del modelo de regresión logistica con una probabilidad del 0.5
+
+```{r}
+# Changing probabilities
+predict_reg <- ifelse(predict_reg >0.5, 1, 0)
+
+# Evaluating model accuracy
+# using confusion matrix
+table(test$ActFuturo, predict_reg)
+
+missing_classerr <- mean(predict_reg != test$ActFuturo)
+print(paste('Accuracy =', 1 - missing_classerr))
+```
+
+
+```{r}
+# ROC-AUC Curve
+ROCPred <- prediction(predict_reg, test$ActFuturo)
+ROCPer <- performance(ROCPred, measure = "tpr",
+							x.measure = "fpr")
+
+auc <- performance(ROCPred, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+
+```{r}
+# Plotting curve
+plot(ROCPer)
+plot(ROCPer, colorize = TRUE,
+	print.cutoffs.at = seq(0.1, by = 0.1),
+	main = "ROC CURVE")
+abline(a = 0, b = 1)
+
+auc <- round(auc, 4)
+legend(.6, .4, auc, title = "AUC", cex = 1)
+```
+**Selección del modelo**
+
+De acuerdo con la evaluación de los modelos con respecto a sus metricas se seleccionó el modelo de regresión logistica, debido que cuenta con precision del 79%, una sensibilidad del 65.9% y una especificidad del 72.3%. 
+
+**OBTENIENDO LAS PROBABILIDADES MEDIANTE LOGISTIC REGRESSION EN EL DF DE SEPTIEMBRE **
+
+```{r}
+# Predict test data based on model
+predict_reg_201409 <- predict(logistic_model,
+					df_201409, type = "response")
+
+#pasando a data.table predict_arbol
+predict_reg_201409 <- as.data.table(predict_reg_201409)
+
+# Agregando los resultados de la prediccion del arbol de decisión al dataframe test
+df_201409$prob_irse = predict_reg_201409$predict_reg_201409
+
+
+df_201409
+
+```
+
+
+ordenando por la columna prob_irse
+
+```{r}
+df_201409 <- df_201409[order(-df_201409$prob_irse),]
+df_201409
+```
+filtrando los usuarios con probabilidad de irse mayor a 0.73
+```{r}
+
+
+df_201409[df_201409$prob_irse > 0.73]
+```
+
+seleccionando los primeros 120143 clientes con mayor probabilidad de irse.
+
+```{r}
+df_201409 <- df_201409[1:120143,]
+df_201409
+```
+
+
+
+
