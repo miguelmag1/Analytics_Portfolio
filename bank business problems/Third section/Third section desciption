@@ -1,0 +1,15 @@
+ENGLISH VERSION
+
+**Description**
+In this section the objective is to answer this question "Which customers should be included in the loyalty strategy for the next three months in order to encourage 
+the use of the products offered by the company?". To answer this question is necessary to use the sliding window technique and to create different models (decision tree, 
+logistic regression, etc) that forecast the behavior of the clients in December month, previously to apply the models in September month. It should be noted that the models 
+were previously created and tested with the data for the months of April, May, and June.
+
+______________________________________________________________________________________________________________________________________________
+VERSIÓN EN ESPAÑOL
+
+En esta sección el objetivo es responder a esta pregunta "¿Qué clientes se deben incluir en la estrategia de fidelización para los próximos tres meses con el fin de incentivar
+el uso de los productos ofrecidos por la empresa?". Para responder a esta pregunta es necesario utilizar la técnica de la ventana deslizante y crear diferentes modelos (árbol de decisión,
+regresión logística, etc) que pronostican el comportamiento de los clientes en el mes de diciembre, previo a aplicar los modelos en el mes de septiembre. Cabe señalar que los modelos
+fueron creados y probados previamente con los datos de los meses de abril, mayo y junio.
