@@ -1,10 +1,30 @@
+ENGLISH VERSION
 This project is divided into three sections, that describes below:
+
 1. User visualization that answer "What would be the number of clients that would be part of the campaign month by month?".
+
 2. The loyalty team is in the initial phase of creating a reactivation strategy whose objective is to encourage the use of 
 the products offered by the company. The campaign will be aimed at those customers who show inactivity. For this exercise is necessary to respond to this question
 "How can I create a strategy that encourages the use of my products focused on the characteristics of my clients?". To answer this question is necessary to apply
 the KNN methodology in December 2013 clients, through a decision tree assigned the cluster to June 2014 clients, and evaluated the change of cluster between this month.
+
 3. In this section the objective is to answer this question "Which customers should be included in the loyalty strategy for the next three months in order to encourage 
 the use of the products offered by the company?". To answer this question is necessary to use the sliding window technique and to create different models (decision tree, 
 logistic regression, etc) that forecast the behavior of the clients in December month, previously to apply the models in September month. It should be noted that the models 
 were previously created and tested with the data for the months of April, May, and June.
+
+_______________________________________________________________________________________________________________________________
+VERSION EN ESPAÑOL
+Este proyecto se divide en tres secciones, que se describen a continuación:
+
+1. Visualización del usuario que responda "¿Cuál sería el número de clientes que formarían parte de la campaña mes a mes?".
+
+2. El equipo de fidelización se encuentra en la fase inicial de creación de una estrategia de reactivación cuyo objetivo es incentivar el uso de
+los productos que ofrece la empresa. La campaña estará dirigida a aquellos clientes que muestren inactividad. Para este ejercicio es necesario responder a esta pregunta
+"¿Cómo puedo crear una estrategia que fomente el uso de mis productos enfocada en las características de mis clientes?". Para responder a esta pregunta es necesario aplicar
+la metodología KNN en clientes de diciembre de 2013, a través de un árbol de decisión asignó el clúster a los clientes de junio de 2014, y evaluó el cambio de clúster entre este mes.
+
+3. En esta sección el objetivo es responder a esta pregunta "¿Qué clientes se deben incluir en la estrategia de fidelización para los próximos tres meses con el fin de incentivar
+el uso de los productos ofrecidos por la empresa?". Para responder a esta pregunta es necesario utilizar la técnica de la ventana deslizante y crear diferentes modelos (árbol de decisión,
+regresión logística, etc) que pronostican el comportamiento de los clientes en el mes de diciembre, previo a aplicar los modelos en el mes de septiembre. Cabe señalar que los modelos
+fueron creados y probados previamente con los datos de los meses de abril, mayo y junio.
