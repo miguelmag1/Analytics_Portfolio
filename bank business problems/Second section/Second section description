@@ -1,3 +1,4 @@
+ENGLISH VERSION
 Second section description
 
 The loyalty team is in the initial phase of creating a reactivation strategy whose objective is to encourage the use of 
@@ -6,4 +7,16 @@ the products offered by the company. The campaign will be aimed at those custome
 the KNN methodology in December 2013 clients, through a decision tree assigned the cluster to June 2014 clients, and evaluated the change of cluster between this month.
 
 Tools
+R
+
+_____________________________________________________________________________________________________________________
+VERSION EN ESPAÑOL
+Descripción de la segunda sección
+
+El equipo de fidelización se encuentra en la fase inicial de creación de una estrategia de reactivación cuyo objetivo es incentivar el uso de
+los productos que ofrece la empresa. La campaña estará dirigida a aquellos clientes que muestren inactividad. Para este ejercicio es necesario responder a esta pregunta
+"¿Cómo puedo crear una estrategia que fomente el uso de mis productos enfocada en las características de mis clientes?". Para responder a esta pregunta es necesario aplicar
+la metodología KNN en clientes de diciembre de 2013, a través de un árbol de decisión asignó el clúster a los clientes de junio de 2014, y evaluó el cambio de clúster entre este mes.
+
+Herramientas
 R
