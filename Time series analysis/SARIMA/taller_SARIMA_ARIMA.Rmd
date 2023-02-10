@@ -1,0 +1,456 @@
+---
+title: "MODELOS ARIMA"
+author: "Miguel Gomez"
+date: '2022-08-14'
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data
+```{r}
+library(dplyr)
+library(readr)
+meat_production_tonnes <- read_csv("meat-production-tonnes.csv")
+View(meat_production_tonnes)
+```
+
+seleccionando la producción de carne para Irán
+
+
+
+```{r}
+colnames(meat_production_tonnes)
+```
+
+```{r}
+meat_production_colombia <- meat_production_tonnes %>%
+    filter(Entity=="Iran") %>%
+    select(Year,Meat_tons)
+View(meat_production_colombia)
+#meat_production_colombia$Meat_tons = log(meat_production_colombia$Meat_tons)
+```
+
+
+
+## 1. Introducción:
+
+
+
+Se tomó una serie anual que comprende la producción de carne en toneladas por país desde 1961 a 2018, en donde se seleccionó a Irán, la data fue tomada de https://ourworldindata.org/meat-production
+
+## 2. Gráfico de la serie original
+
+
+```{r}
+#importando librerias
+library("readxl")
+library(TSA)
+library(tseries)
+
+```
+
+```{r}
+tsmeat_production_colombia = ts(meat_production_colombia[,2], start=1961, frequency=1) #Convietiendolo a un objeto time series
+plot(tsmeat_production_colombia,ylab='meat production [Tons]',xlab='año',type='o')#Gráfico de la serie anual
+
+```
+
+
+ Hay tendencia? Se observa que existe una tendencia ascendente en la serie, dado que la producción de carne en irán ha incrementado desde 1961 a 2018 un poco más de 9 veces. Pasando de producir 319710 Toneladas de carne en 1961 a producir 3086281 Toneladas en 2018.
+ 
+Hay estacionalidad? No hay estacionalidad porque no es una serie mensual. No se evidencian ciclos.
+ 
+
+```{r}
+a=sd(tsmeat_production_colombia)
+plot(tsmeat_production_colombia)
+abline(h=-3*a)
+abline(h=+3*a)
+```
+Hay heterocedasticidad?
+
+De acuerdo con la gráfica anterior se observan valores extremos desde el año 2011 en adelante, por lo cual se considera que hay heterocedasticidad.
+
+## 3. Cumplir con los pasos de ajuste de  modelos propuestos por Box- Jen-kins.
+
+### metodo Box-Jen-kins.
+
+#### Criterio 1
+Como se observó anteriormente la serie claramente tiene tendencia, por lo cual se debe diferenciar.
+
+```{r}
+s0=sd(tsmeat_production_colombia)
+s1=sd(diff(tsmeat_production_colombia,lag=1,differences=1))
+s2=sd(diff(tsmeat_production_colombia,lag=1,differences=2))
+s3=sd(diff(tsmeat_production_colombia,lag=1,differences=3))
+
+```
+Se debe saber cual es el número necesario de diferencias, por ende se le saca la desviación estandar a la serie a medida que se diferencia para mirar en que diferencia es la que disminuye su desviacion estandar antes de incrementarse, de acuerdo con el criterio de victor guerrero, en este caso se sugiere 1 diferencia.
+
+```{r}
+s0 #desviacion estandar de la serie
+s1 #diferencia 1
+s2 #diferencia 2
+s3
+```
+#### Criterio 2.
+
+Graficar la FAC parece sugerir entre una y dos diferencias, pese a que en ambos decae rapidamente hacia cero, en la segunda diferencia decae con mayor rapidez
+
+```{r}
+#Criterio 2.
+
+opcion = par(mfrow=c(2,1))
+#acf(tsmeat_production_colombia, 2)
+acf(diff(tsmeat_production_colombia,lag=1,differences=1), 14)
+acf(diff(tsmeat_production_colombia,lag=1,differences=2), 14)
+
+```
+
+la serie original no es estacionarea, pues ambas pruebas se acepta la hipotesis nula, es decir la serie tiene raiz unitaria y por lo tanto se debe diferenciar por lo menos una vez (corregir observacion)
+
+
+#### Criterio 3. Prueba de raiz unitaria
+
+Ho: no hay raiz unitaria (no es estacionaria)
+Hi: la serie es estacionaria
+
+
+
+```{r}
+#Con pruebas de raiz unitaria.
+adf.test(tsmeat_production_colombia)#La serie original no es estacionaria
+```
+
+De acuerdo con el p valor de la prueba de Dickey-Fuller se acepta la hipótesis nula es decir la serie no es estacionaria.
+
+```{r}
+pp.test(tsmeat_production_colombia)#La serie original no es estacionaria
+```
+De acuerdo con el p valor de la prueba de Phillips-Perron se acepta la hipótesis nula es decir la serie no es estacionaria.
+
+
+#### Diferenciando la serie
+```{r}
+#Se diferencia una vez
+adf.test(diff(tsmeat_production_colombia,lag=1,differences=1))
+```
+Al diferenciar la serie 1 vez y aplicar la prueba de Dickey-Fuller se puede observar que de acuerdo con esta prueba la serie es estacionaria, pues la hipótesis nula se rechaza.
+
+```{r}
+pp.test(diff(tsmeat_production_colombia,lag=1,differences=1))
+```
+
+Al diferenciar la serie 1 vez y aplicar la prueba de Phillips-Perron se puede observar que de acuerdo con esta prueba la serie es estacionaria, pues la hipótesis nula se rechaza.
+
+
+#### identificar el modelo 
+
+
+```{r}
+d1_meat<-diff(tsmeat_production_colombia,lag=1,differences=1)
+plot(d1_meat)
+```
+
+```{r}
+acf(d1_meat)
+```
+
+
+```{r}
+pacf(d1_meat)
+```
+
+De acuerdo con la FAC y la FACP se plantean los siguientes modelos:
+
+ARIMA(p=1,d=1,q=5)
+$$(1- \theta_1 \beta)(1-B)X_{t} =(1-\Theta_{1}\beta-\Theta_{2}\beta^{2}-\Theta_{3}\beta^{3}-\Theta_{4}\beta^{4}-\Theta_{5}\beta^{5})a_{t}  $$
+
+ARIMA(p=1,d=1,q=10)
+$$(1- \theta_1 \beta)(1-B)X_{t} =(1-\Theta_{1}\beta-\Theta_{2}\beta^{2}-\Theta_{3}\beta^{3}-\Theta_{4}\beta^{4}-\Theta_{5}\beta^{5}-\Theta_{6}\beta^{6}-\Theta_{7}\beta^{7}--\Theta_{8}\beta^{8}-\Theta_{9}\beta^{9}-\Theta_{10}\beta^{10})a_{t}  $$
+
+
+
+```{r}
+m1_meat=arima(tsmeat_production_colombia,order=c(1,1,5))
+m2_meat=arima(tsmeat_production_colombia,order=c(1,1,10))
+```
+
+
+```{r}
+m1_meat
+```
+
+
+
+```{r}
+m2_meat
+```
+
+```{r}
+confint(m1_meat)
+
+```
+Con un 0.95 de confianza el parametro ma4 no difiere significativamente de cero porque el intervalo de confianza pasa por el valor cero.
+
+```{r}
+confint(m2_meat)
+```
+Con un 0.95 de confianza los parametros ar1, ma1, ma2, ma3, ma4, ma6, ma7, ma8 y ma9 no difieren significativamente de cero porque el intervalo de confianza pasa por el valor cero.
+
+
+
+### Verificar los supuestos del modelo
+
+#### media de los residuales cero
+
+
+H0: meida residuales = 0 
+
+```{r}
+#modelo 1
+#los residuales tienen media cero?
+t.test(m1_meat$residuals)
+```
+Para el modelo 1 no existe evidencia suficiente para afirmar que la media de los residuales difiere significativamente de cero, pues el valor de p es mayoe a 0.05
+
+```{r}
+#modelo 2
+t.test(m2_meat$residuals)
+```
+De acuerdo con el test t se puede afirmar que para el modelo 2 la media de los residuales difiere significativamente de cero.
+
+
+##### Varianza constante 
+
+```{r}
+#modelo 1
+a=sd(m1_meat$residuals)
+plot(m1_meat$residuals)
+abline(h=-3*a)
+abline(h=+3*a)
+```
+
+
+Para el modelo 1 los residuales tienen un buen comportamiento en varianza, pues no hay valores extremos, es decir valores superiores o inferiores a 3 desviaciones estandar.
+
+```{r}
+#modelo 1
+a=sd(m2_meat$residuals)
+plot(m2_meat$residuals)
+abline(h=-3*a)
+abline(h=+3*a)
+```
+
+
+Para el modelo 2 los residuales tienen un buen comportamiento en varianza, a excepción de los residuales del año 2000 los cuales son valores extremos.
+
+##### Es una serie no correlacionada
+```{r}
+#observamos las fac y facp PARA MI MODELO
+acf(m1_meat$residuals)
+```
+
+
+```{r}
+pacf(m1_meat$residuals)
+```
+
+No se observan correlaciones que se salgan de las bandas para el modeloo 1, lo cual indica que el modelo captura bien la dependencia lineal de los datos.
+
+
+```{r}
+acf(m2_meat$residuals)
+```
+
+```{r}
+pacf(m2_meat$residuals)
+```
+
+Al graficar los residuales del modelo 2 se puede observar que no hay correlaciones que se salgan de las bandas por lo cual se puede afirmar que el modelo captura bien la dependencia lineal de los datos. 
+
+
+## prueba de ljung y box
+```{r}
+Box.test(residuals(m1_meat),lag = 7, type = "Ljung")
+```
+
+
+```{r}
+Box.test(residuals(m2_meat),lag = 7, type = "Ljung")
+```
+
+Al hacer la prueba de Box-Ljung se obtuvo para ambos modelos un p valor superior al 0.05, por lo cual se aprueba la hipotesis nula HO, esto quiere decir que no hay evidencia para afirmar que al menos 1 de las primeras 7 autocorrelaciones difiere de cero, es decir que ambos modelo capturan bien la dependencia lineal en los datos.
+
+
+ahora se va a hacer una visualización con 
+
+```{r}
+tsdiag(m1_meat,gof.lag = 7)
+```
+
+```{r}
+tsdiag(m2_meat,gof.lag = 7)
+```
+
+De acuerdo con el gráfico de Ljung-Box, no hay ningun punto que sobrepase la linea punteada, es decir no se rechaza la hipotesis nula en ninguna de las 7 primeras autocorrelaciones.Es decir, no hay correlaciones significativas en los resifduales tanto para el modelo 1 como para el modelo 2
+
+
+#### Pruebas de normalidad.
+
+##### Modelo 1
+```{r}
+shapiro.test(m1_meat$residuals)
+```
+
+```{r}
+qqnorm(residuals(m1_meat))
+qqline(residuals(m1_meat))
+```
+
+
+```{r}
+hist(rstandard(m1_meat))
+```
+
+
+##### Modelo 2
+```{r}
+shapiro.test(m2_meat$residuals)
+```
+
+
+
+```{r}
+qqnorm(residuals(m2_meat))
+qqline(residuals(m2_meat))
+```
+
+
+
+```{r}
+hist(rstandard(m2_meat))
+```
+
+Para los residuales de los dos modelos se hizo la prueba de shapiro en donde se obtuvieron valores de p inferiores a 0.05 lo cual indica que a 0.95 se rechaza la hipotesis nula, es decir los residuales no siguen una distribución normal
+En la gráfica se observa que no hay un comportamiento normal. por otra parte se hizo una grafica qqplot en donde se identificó que gran parte de los cuantiles de los datos no se aproximan a los cuantiles teoricos, adicionalmente se graficó un histograma para cada modelo en donde se observó que los residuales de ambos modelos no siguen una distribución normal.
+
+#### Cálculo de los criterios de los modelos 
+##### modelo 1
+```{r}
+#Calcular los criterios de informaci�n
+kma=length(m1_meat$coef)
+kma
+n = length(d1_meat)
+n 
+
+
+```
+
+```{r}
+# AIC                         Returned Value
+log(m1_meat$sigma2) + (n+2*kma)/n        
+
+```
+```{r}
+# BIC
+log(m1_meat$sigma2) + kma*log(n)/n #Este          
+     
+#Dos de los tres cirterios seleccionan el modelo 1
+```
+
+##### modelo 2
+```{r}
+#Calcular los criterios de informaci�n
+kma=length(m2_meat$coef)
+kma
+n = length(d1_meat)
+n 
+
+
+```
+AIC 
+```{r}
+# AIC                         Returned Value
+log(m2_meat$sigma2) + (n+2*kma)/n        
+
+```
+
+BIC
+```{r}
+# BIC
+log(m2_meat$sigma2) + kma*log(n)/n #Este          
+     
+#Dos de los tres cirterios seleccionan el modelo 1
+```
+De acuerdo con el AIC y BIC el mejor modelo es el 1 pues este es el de monor AIC y BIC, sim embargo, los valores de los criterios de cada modelo son muy cercanos, por lo cual se procede a hacer el pronostico con los dos modelos y al final se seleccionará el que menor error cuadratico medio tenga, menor varianza y principalmente el que de el mejor pronostico.
+
+### Pronostico del modelo
+
+
+##### Pronostico modelo 1
+
+```{r}
+train=ts(tsmeat_production_colombia[1:51], start=1961, frequency=1)
+test=ts(tsmeat_production_colombia[51:58], start=2018, frequency=1)
+m1_1=arima(train,order=c(1,1,5) ,fixed = c(0,0,0,NaN,0,NaN))
+m2_1=arima(train,order=c(1,1,10),fixed = c(0,0,0,0,0,0,0,0,0,NaN,NaN))
+
+
+### prediccion 1
+
+prediccion1 = predict(m1_1, n.ahead=10)
+U = prediccion1$pred + 2*prediccion1$se
+L = prediccion1$pred - 2*prediccion1$se
+
+ts.plot(tsmeat_production_colombia,prediccion1$pred, col=1:2, type="o", xlim=c(1961,2020),main=('Prediccion Modelo1'))
+lines(U, col="blue", lty="dashed")
+lines(L, col="blue", lty="dashed")
+
+```
+
+##### Pronostico modelo 2
+```{r}
+m2_1=arima(train,order=c(1,1,10),fixed = c(0,0,0,0,0,0,0,0,0,NaN,NaN))
+
+
+### prediccion 2
+prediccion2 = predict(m2_1, n.ahead=10)
+U2 = prediccion2$pred + 2*prediccion2$se
+L2 = prediccion2$pred - 2*prediccion2$se
+
+ts.plot(tsmeat_production_colombia,prediccion2$pred, col=1:2, type="o", xlim=c(1961,2020),main=('Prediccion Modelo2'))
+lines(U2, col="blue", lty="dashed")
+lines(L2, col="blue", lty="dashed")
+
+```
+
+
+
+```{r}
+library(MLmetrics)
+Modelos=c('m1','m2')
+MAPE_modelos=c(MAPE(prediccion1$pred,test),MAPE(prediccion2$pred,test))
+RMSE_modelos=c(RMSE(prediccion1$pred,test),RMSE(prediccion2$pred,test))
+MAE_modelos=c(MAE(prediccion1$pred,test),MAE(prediccion2$pred,test))
+eval=data.frame(Modelos,MAPE_modelos,RMSE_modelos,MAE_modelos)
+eval
+```
+
+De acuerdo con los resultados obtenidos se puede afirmar que el mejor modelo es el 1 pues tiene el menor MAPE con un error aproximado de 3.7%, con un error prediccion  del modelo de 110727.9 de tonelada de carne y con una distancia promedio de lo pronosticado y de lo observado de 98883.5 toneladas de carne, cabe resaltar que al graficar lo pronosticado intra muestra en los ultimos periodos el modelo dos gráficamente se muestra mas acertado
+
+
+modelo 1 
+
+
+ARIMA(p=1,d=1,q=5)
+$$(1+ 0.9903 \beta)(1-B)X_{t} =(1+0.7883\beta+0.6161\beta^{2}-0.4221\beta^{3}-0.4644\beta^{5})a_{t}  $$
+modelo 2 
+
+
+$$(1-B)X_{t} =(1-0.4725\beta^{5}-0.4491\beta^{10})a_{t}  $$
