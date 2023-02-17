@@ -1,0 +1,226 @@
+---
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+IMPORTANDO LIBRERIAS 
+
+```{r}
+library(data.table)
+```
+
+Importando df con la información para trabajar del punto 3 en adelante.
+
+```{r}
+#read csv with data.table
+df<- fread("CONSULTA3EXP.csv",sep = ";")
+           
+```
+
+```{r}
+colnames(df)
+```
+
+Eliminando datos duplicados 
+```{r}
+df=df[!duplicated(df$IDENTIFICADOR),]
+```
+3.	Debe obtener la edad de los trabajadores y:
+
+```{r}
+#Creando funcion para calculo de años a la fecha de hoy feb 15 de 2023
+
+FunctionAge <- function(x) {
+  as.numeric(as.Date(Sys.Date()) - as.Date(x)) / 365
+}
+```
+Creando columna con la edad de cada afiliado
+
+```{r}
+df$EDAD_AFILIADOS <- sapply(df$FEC_NACIMIENTO, FunctionAge)
+```
+redondeando edad 
+```{r}
+df$EDAD_AFILIADOS <- sapply(df$EDAD_AFILIADOS, floor)
+
+```
+
+
+a.	Clasificarlos por rangos de 5 años
+Creando función para segmentar las edades cada 5 años.
+```{r}
+age_segment <- function(x){
+  if (x < 5) {
+    return("0-5")
+  } else if (x >= 5 & x < 10) {
+    return("5-10")
+  } else if (x >= 10 & x < 15) {
+    return("10-15")
+  } else if (x >= 15 & x < 20) {
+    return("15-20")
+  } else if (x >= 20 & x < 25) {
+    return("20-25")
+  } else if (x >= 25 & x < 30) {
+    return("25-30")
+  } else if (x >= 30 & x < 35) {
+    return("30-35")
+  } else if (x >= 35 & x < 40) {
+    return("35-40")
+  } else if (x >= 40 & x < 45) {
+    return("40-45")
+  } else if (x >= 45 & x < 50) {
+    return("45-50")
+  } else if (x >= 50 & x < 55) {
+    return("50-55")
+  } else if (x >= 55 & x < 60) {
+    return("55-60")
+  } else if (x >= 60 & x < 65) {
+    return("60-65")
+  } else if (x >= 65 & x < 70) {
+    return("65-70")
+  } else if (x >= 70 & x < 75) {
+    return("70-75")
+  } else if (x >= 75 & x < 80) {
+    return("75-80")
+  } else if (x >= 80 & x < 85) {
+    return("80-85")
+  } else if (x >= 85 & x < 90) {
+    return("85-90")
+  } else if (x >= 90 & x < 95) {
+    return("90-95")
+  } else if (x >= 95 & x < 100) {
+    return("95-100")
+  } else if (x >= 100 & x < 105) {
+    return("100-105")
+  } else if (x >= 105 & x < 110) {
+    return("105-110")
+  }}
+
+```
+
+Aplicando función para segmentar las edades
+```{r}
+df$SEGMENTO_EDAD <- sapply(df$EDAD_AFILIADOS, age_segment)
+```
+
+
+b.	Mencionar cuantos afiliados hay en cada rango
+```{r}
+df_segmento_edad= df[,.(count = .N), by = .(SEGMENTO_EDAD)]
+df_segmento_edad
+```
+
+c.	Mencionar el porcentaje de cada rango respecto al total de afiliados.
+```{r}
+df_segmento_edad$porcentaje = ((df_segmento_edad$count/1493375)*100)
+options(scipen=99)
+df_segmento_edad
+```
+
+4.	Las Empresas y aportantes realizan unos aportes para su afiliación, por favor identifique cuales son los municipios con mayor cantidad de aportes. A su vez, mencione el porcentaje de aportes por cada municipio.
+Componente analítico (30%)
+
+```{r}
+df_municipio=df[,.(APO_TOTAL_MENSUAL = sum(APO_TOTAL_MENSUAL)), by = .(COD_MUNICIPIO_DANE)]
+df_municipio$porcentaje_aportes=(df_municipio$APO_TOTAL_MENSUAL/sum(df$APO_TOTAL_MENSUAL, na.rm = TRUE))*100 
+df_municipio <- df_municipio[order(df_municipio$porcentaje_aportes, decreasing = TRUE),]
+df_municipio
+```
+Teniendo en cuenta la información que obtuvo anteriormente, realice un gráfico por cada punto con sus respectivas observaciones.
+A su vez, realice una propuesta qué permita aumentar el recaudo de aportes.
+
+
+Punto 3b
+```{r}
+hist(df$EDAD_AFILIADO, breaks = 16, main = "HISTOGRAMA DE EDAD DE AFILIADOS", ylab = "Frecuencia", xlab = "Edad de afiliados")
+```
+
+
+De acuerdo con la gráfica del histograma se puede observar que la mayoría de afiliados se encuentran en los grupos etarios de 25-30, 30-35, 35-40, sin embargo este dato no es muy diciente, dado que es necesario hacer un análisis más profundo que involucre mayor cantidad de variables sociodemográfica como el nivel de escolaridad, a la industria que pertenece, estrato, municipio entre otras.
+
+
+**Cantidad de afiliados por municipio**
+
+```{r}
+df_c_mpio=df[,.(count = .N), by = .(COD_MUNICIPIO_DANE) ]
+df_c_mpio <- df_c_mpio[order(df_c_mpio$count, decreasing = TRUE),]
+df_c_mpio
+```
+
+Gráfica de los 10 primeros municipios con mayor cantidad de usuarios
+
+```{r}
+barplot(df_c_mpio$count[2:11], main = "10 primeros municipios en cantidad de afiliados sin contar Bogotá", xlab = "Municipios", ylab = "Frecuencia")
+```
+
+
+De acuerdo con la tabla que muestra la frecuencia de afiliados por municipio, se puede identificar que Bogotá registra la mayor cantidad de usuarios, con 1.282.372 usuarios, seguido del municipio de Soacha con Código "25754" que tiene 30.827. Así mismo Bogotá supera en gran manera en el término de aportes a los otros municipios del país, pues solo Bogotá representa el 96% de los ingresos con un valor total de 203.215.350.163.988 COP, seguido del municipio de Soacha con 3.891.383.272.190 COP que representa el 1.8% de los ingresos en aportes.
+
+Si se quiere ganar más aportantes, se debe fijar una estrategia que abarque los demás municipios del país, empezando por: Soacha(25754), Chía(25175), Fusagasugá(25290), Girardot(25307), Facatativá(25269), Cajicá(25126), Funza(25286), Tocancipá(25817), Mosquera(25473) y Cota(25214). Los municipios mencionados anteriormente tienen en común su cercanía a Bogotá, es importante ahondar en la descripción de las características sociodemográficas de los afiliados pertenecientes a estos municipios, lo cual se hará, a continuación.
+
+
+**Municipios objetivo de estrategia**
+```{r}
+df_objetivo <- df[df$COD_MUNICIPIO_DANE %in% c("25754","25175","25290","25307","25269","25126","25286","25817","25473","25214"),]
+df_objetivo
+```
+
+**Edad de Afiliados municipios objetivo de fidelización**
+
+```{r}
+hist(df_objetivo$EDAD_AFILIADO, breaks = 16, main = "HISTOGRAMA DE EDAD DE AFILIADOS OBJETIVO", ylab = "Frecuencia", xlab = "Edad de afiliados")
+
+```
+
+
+El histograma de la edad muestra que para los municipios objetivo a obtener mas clientes, la mayoria de afiliados tienen edades entre 25 y 35 años.
+
+**box-plot aporte mensual de municipios objetivo**
+
+```{r}
+df_bajo <- df[df$COD_MUNICIPIO_DANE %in% c("25269", "25290","25307"),]
+
+boxplot( df_bajo$APO_TOTAL_MENSUAL ~  df_bajo$COD_MUNICIPIO_DANE, main = "Municipios Facatativá, Fusagasugá y Girardot", xlab = "Municipios ", ylab = "Aportes en COP")
+
+# "25269", "25290","25307" mas bajos
+# "25214", "25286", "25473"   medios
+#25126, "25175" "25817", "25754" mas altos
+```
+
+
+En el boxplot de los municipios de Facatativá, Fusagasugá y Girardot, se pude identificar que el municipio con una brecha mayor entre el 50% de los afiliados es el de Girardot, cabe resaltar que a pesar de tener datos atípicos en los tres municipios los aportes en su mayoría no superan los 5MM de COP.
+
+```{r}
+df_medio <- df[df$COD_MUNICIPIO_DANE %in% c("25214", "25286", "25473" ),]
+
+boxplot( df_medio$APO_TOTAL_MENSUAL ~  df_medio$COD_MUNICIPIO_DANE, main = "Municipios Cota, Funza y Mosquera", xlab = "Municipios ", ylab = "Aportes en COP")
+
+```
+-
+
+En la gráfica de box-plot que agrupa los municipios de Cota, Funza y Mosquera, se puede identificar 
+que aproximadamenteel 75% de los afiliados de estos municipios tienen aportes por debajo de 10 millones y que Mosquera es el municipio que mayor cantidad de usuarios con un aporte diferente significativamente a la población de afiliados en este municipio tiene.
+
+
+```{r}
+df_alto <- df[df$COD_MUNICIPIO_DANE %in% c("25126", "25175", "25817", "25754" ),]
+
+boxplot( df_alto$APO_TOTAL_MENSUAL ~  df_alto$COD_MUNICIPIO_DANE, main = "Municipios Cajicá, Tocancipá y Soacha", xlab = "Municipios ", ylab = "Aportes en COP")
+```
+
+En la anterior gráfica se puede identificar a Tocancipá como el municipio con los valores más altos de aportantes, el 75% de los afiliados superan los 10.602.000 COP en aportes. Por otra parte Soacha aunque tiene valores altos de aportantes, donde el máximo aporta 465.851.900, siendo un valor atípico, tiene personas con valores de aporte en negativo.
+
+
+**Recomendaciones**
+
+- Se recomienda crear planes de recreación para los municipios de Tocancipá, dado que tiene un mayor porcentaje de afiliados con un 75% que supera los 10.602.000 COP en aportes.
+
+- En Soacha se recomienda dar beneficios a las personas que están en mora, dado que hay aportes que están en negativo.
+
+- Se recomienda dirigir las campañas a las personas que tienen entre 20 y 40 años, dado que es la mayor parte de la población de los municipios objetivo.
+
+- Se recomienda ofertar campañas de subsidios para los afiliados de Funza, Mosquera, Facatativá y Fusagasugá, pues el 50% de los afiliados de estos departamentos aporta de 18.200 COP a 142.000, siendo de los más bajos.
+
+
