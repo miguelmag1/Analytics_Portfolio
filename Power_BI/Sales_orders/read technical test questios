@@ -1,0 +1,10 @@
+This dashboard was created to solve a technical test for the position of a data analyst with power bi.
+
+1. Geographical distribution of sales with a filter that allows you to see the evolution through the order dates.
+2. Monthly evolution of orders for sales and profit.
+3. Top 10 customers by year, month, and region.
+4. Ranking of the most sold and profitable Categories and Subcategories by region, year, and year-month.
+5. Performance of regional managers over time by sales and profit.
+6. KPI of year-on-year sales variation between 2,019 and 2,022 by region.
+7. 2019-2022year-on-year Earnings Change KPI by region.
+8. Comparison of efficiency in shipping days depending on the shipping method.
