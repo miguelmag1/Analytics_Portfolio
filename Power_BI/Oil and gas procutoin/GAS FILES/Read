@@ -1,0 +1,4 @@
+En esta carpeta encontrará los archivos XLSX con la producción anual de GAS tomados para el tablero
+fuente: https://www.anh.gov.co/es/operaciones-y-regal%C3%ADas/sistemas-integrados-operaciones/estad%C3%ADsticas-de-producci%C3%B3n/
+estos archivos fueron modificados para poderlos preprocesar en el código de python, es decir algunos nombres de las columnas fueron cambiados con
+respecto a la forma de escribirse en el original.
