@@ -1,0 +1,10 @@
+st_aggrid
+streamlit
+pandas
+pandas_profiling
+streamlit_pandas_profiling
+pandas_profiling
+PIL
+os
+re
+numpy
